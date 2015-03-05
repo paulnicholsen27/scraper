@@ -2,6 +2,9 @@ import requests
 import re
 import os
 import urllib2
+import sys
+import shutil
+
 from bs4 import BeautifulSoup 
 
 from auth import username, password
@@ -18,7 +21,7 @@ def empty_folder(*args):
         for f in os.listdir(folder):
             file_path = os.path.join(folder, f)
             try:
-                if os.path.isfile(file_path) and (file_path.endswith('.pdf') or file_path.endswith('.mp3')):
+                if os.path.isfile(file_path):
                     os.unlink(file_path)
             except Exception, e:
                 print e
@@ -26,7 +29,6 @@ def empty_folder(*args):
 def get_form_id(session, url):
     page = session.get(url)
     soupped_page = BeautifulSoup(page.content)
-    # print page.content
     form_build_id = soupped_page.select('input[name="form_build_id"]')[0]['value']
     form_token = soupped_page.select('input[name="form_token"]')
     if form_token:
@@ -77,8 +79,8 @@ def write_sheet_music_to_file(session, sheet_music_links, directory_str):
         to specified directory_str for that concert period'''
     for filename in sheet_music_links:
         new_filename = filename[0].replace('/', '_')
-        print new_filename
-
+        if new_filename.find('.pdf') == -1:
+            new_filename += '.pdf'
         f = open(directory_str + new_filename, 'wb')
         f.write(session.get(filename[1]).content)
         f.close()
@@ -86,7 +88,7 @@ def write_sheet_music_to_file(session, sheet_music_links, directory_str):
 def write_recording_to_file(session, link, file_path, cookies):
     '''downloads all recording sessions to proper directories'''
     song = session.get(link, cookies=cookies)
-    with open(file_path, 'wb') as handle:
+    with open(file_path+'.mp3', 'wb') as handle:
         for block in song.iter_content(1024):
             if not block:
                 break
@@ -102,7 +104,6 @@ def process_recording_links(session, recording_links, directory_str, cookies):
             os.makedirs(directory)
     for recording_link in recording_links:
         if recording_link[0] != "":
-
             title = recording_link[0]
             url = recording_link[1]
             if 'B1B2' in title:
@@ -113,8 +114,6 @@ def process_recording_links(session, recording_links, directory_str, cookies):
                 voiced_directory = full_directory
             fullpath = '{0}{1}'.format(
                 voiced_directory, title.replace('/', '_'))
-            print "fullpath: ", fullpath
-            print "url: ", url
             if not os.path.isfile(fullpath):
                 if url.lower().find('.mp3') != -1:
                     write_recording_to_file(
@@ -130,7 +129,6 @@ def main():
         if not os.path.exists(directory):
             os.makedirs(directory)
     empty_folder(sheet_music_directory, recording_directory)
-    print recording_links
     write_sheet_music_to_file(session, sheet_music_links, sheet_music_directory)
     process_recording_links(session, recording_links, recording_directory, cookies)
 
