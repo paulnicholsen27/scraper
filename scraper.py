@@ -5,11 +5,11 @@ import urllib2
 import sys
 import shutil
 
-from bs4 import BeautifulSoup 
+from bs4 import BeautifulSoup
 
 from auth import username, password
 
-from pprint import pprint 
+from pprint import pprint
 
 music_url = "http://gmcw.groupanizer.com/g/music"
 
@@ -26,6 +26,7 @@ def empty_folder(*args):
             except Exception, e:
                 print e
 
+
 def get_form_id(session, url):
     page = session.get(url)
     soupped_page = BeautifulSoup(page.content)
@@ -36,19 +37,20 @@ def get_form_id(session, url):
     else:
         return form_build_id, None
 
+
 def login(session, username, password):
     form_build_id = get_form_id(session, "http://gmcw.groupanizer.com")
     payload = {'name': username,
-                'pass': password,
-                'form_build_id': form_build_id,
-                'form_id': "user_login",
-                'op': 'Log in'}
+              'pass': password,
+              'form_build_id': form_build_id,
+              'form_id': "user_login",
+              'op': 'Log in'}
     logged_in = session.post("http://gmcw.groupanizer.com/g/dashboard", data=payload)
     cookies = logged_in.cookies
     return cookies
 
 
-def parse_page(session, concert_id=58):
+def parse_page(session, concert_id=164):
     sheet_music_links = []
     recording_links = []
     form_build_id, form_token = get_form_id(session, music_url)
@@ -61,7 +63,9 @@ def parse_page(session, concert_id=58):
     cookies = login(session, username, password)
     music_page = session.get("http://gmcw.groupanizer.com/g/music?field_music_categories_tid=58", cookies=cookies)
     soup = BeautifulSoup(music_page.content)
+    print soup
     links = ['http://gmcw.groupanizer.com'+link.get('href') for link in set(soup.find_all("a", "field_music_files"))]
+    print links
     for link in links:
         page = session.get(link, cookies=cookies)
         soup = BeautifulSoup(page.content)
@@ -74,6 +78,7 @@ def parse_page(session, concert_id=58):
                     (music_link.text, music_link.get('href')))
     return sheet_music_links, recording_links, cookies
 
+
 def write_sheet_music_to_file(session, sheet_music_links, directory_str):
     '''takes as input list of music links and writes all sheet music
         to specified directory_str for that concert period'''
@@ -85,6 +90,7 @@ def write_sheet_music_to_file(session, sheet_music_links, directory_str):
         f.write(session.get(filename[1]).content)
         f.close()
 
+
 def write_recording_to_file(session, link, file_path, cookies):
     '''downloads all recording sessions to proper directories'''
     song = session.get(link, cookies=cookies)
@@ -93,6 +99,7 @@ def write_recording_to_file(session, link, file_path, cookies):
             if not block:
                 break
             handle.write(block)
+
 
 def process_recording_links(session, recording_links, directory_str, cookies):
     '''sends recordings and respective directory strings to be written'''
@@ -106,9 +113,9 @@ def process_recording_links(session, recording_links, directory_str, cookies):
         if recording_link[0] != "":
             title = recording_link[0]
             url = recording_link[1]
-            if 'B1B2' in title:
+            if any(voice_part in title for voice_part in ['B1', 'B2']):
                 voiced_directory = lower_directory
-            elif 'T1T2' in title:
+            elif any(voice_part in title for voice_part in ['T1', 'T2']):
                 voiced_directory = upper_directory
             else:
                 voiced_directory = full_directory
@@ -119,10 +126,13 @@ def process_recording_links(session, recording_links, directory_str, cookies):
                     write_recording_to_file(
                         session, url, fullpath, cookies)
 
+
 def main():
     session = requests.session()
     sheet_music_links, recording_links, cookies = parse_page(session)
     base_directory_str = '/Users/paulnichols/Dropbox/chorus_music/'
+    if not os.path.isdir(base_directory_str):
+        base_directory_str = "/Users/pnichols/Dropbox/chorus_music/"  #if on work computer or somewhere else dumb
     sheet_music_directory = base_directory_str + "sheet_music/"
     recording_directory = base_directory_str + "recordings/"
     for directory in [sheet_music_directory, recording_directory]:
