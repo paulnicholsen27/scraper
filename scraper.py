@@ -16,7 +16,8 @@ music_url = "http://gmcw.groupanizer.com/g/music"
 
 def empty_folder(*args):
     '''cleans out folder and redownloads'''
-    #!!!TODO: check to see if file exists; if old version, replace, else leave alone
+    #!!!TODO: check to see if file exists;
+    #if old version, replace, else leave alone
     for folder in args:
         for f in os.listdir(folder):
             file_path = os.path.join(folder, f)
@@ -30,7 +31,8 @@ def empty_folder(*args):
 def get_form_id(session, url):
     page = session.get(url)
     soupped_page = BeautifulSoup(page.content)
-    form_build_id = soupped_page.select('input[name="form_build_id"]')[0]['value']
+    form_build_id = soupped_page.select(
+        'input[name="form_build_id"]')[0]['value']
     form_token = soupped_page.select('input[name="form_token"]')
     if form_token:
         return form_build_id, form_token[0].get('value')
@@ -40,12 +42,15 @@ def get_form_id(session, url):
 
 def login(session, username, password):
     form_build_id = get_form_id(session, "http://gmcw.groupanizer.com")
+
     payload = {'name': username,
-              'pass': password,
-              'form_build_id': form_build_id,
-              'form_id': "user_login",
-              'op': 'Log in'}
-    logged_in = session.post("http://gmcw.groupanizer.com/g/dashboard", data=payload)
+               'pass': password,
+               'form_build_id': form_build_id,
+               'form_id': "user_login",
+               'op': 'Log in'}
+    logged_in = session.post(
+        "http://gmcw.groupanizer.com/user/login?destination=g/dashboard",
+        data=payload)
     cookies = logged_in.cookies
     return cookies
 
@@ -54,18 +59,12 @@ def parse_page(session, concert_id=164):
     sheet_music_links = []
     recording_links = []
     form_build_id, form_token = get_form_id(session, music_url)
-    payload = {'terms[]': concert_id,
-               'op': 'Filter',
-               'form_build_id': form_build_id,
-               'form_token': form_token,
-               'form_id': 'user_login'
-               }
     cookies = login(session, username, password)
-    music_page = session.get("http://gmcw.groupanizer.com/g/music?field_music_categories_tid=58", cookies=cookies)
+    music_page = session.get(
+        "http://gmcw.groupanizer.com/g/music?field_music_categories_tid={}".format(concert_id),
+        cookies=cookies)
     soup = BeautifulSoup(music_page.content)
-    print soup
     links = ['http://gmcw.groupanizer.com'+link.get('href') for link in set(soup.find_all("a", "field_music_files"))]
-    print links
     for link in links:
         page = session.get(link, cookies=cookies)
         soup = BeautifulSoup(page.content)
@@ -113,9 +112,9 @@ def process_recording_links(session, recording_links, directory_str, cookies):
         if recording_link[0] != "":
             title = recording_link[0]
             url = recording_link[1]
-            if any(voice_part in title for voice_part in ['B1', 'B2']):
+            if any(voice_part in title for voice_part in ['B1', 'B2', 'BB']):
                 voiced_directory = lower_directory
-            elif any(voice_part in title for voice_part in ['T1', 'T2']):
+            elif any(voice_part in title for voice_part in ['T1', 'T2', 'TT']):
                 voiced_directory = upper_directory
             else:
                 voiced_directory = full_directory
@@ -132,7 +131,7 @@ def main():
     sheet_music_links, recording_links, cookies = parse_page(session)
     base_directory_str = '/Users/paulnichols/Dropbox/chorus_music/'
     if not os.path.isdir(base_directory_str):
-        base_directory_str = "/Users/pnichols/Dropbox/chorus_music/"  #if on work computer or somewhere else dumb
+        base_directory_str = "/Users/pnichols/Dropbox/chorus_music/"  # if on work computer or somewhere else dumb
     sheet_music_directory = base_directory_str + "sheet_music/"
     recording_directory = base_directory_str + "recordings/"
     for directory in [sheet_music_directory, recording_directory]:
